@@ -1,0 +1,61 @@
+name: Release Sausage Automsg
+
+on:
+  push:
+    tags:
+      - '*' # Spustí sa pri akomkoľvek tagu (napr. 1.0.0, v1.0)
+
+permissions:
+  contents: write # Potrebné pre vytváranie releasov a pushovanie zmien
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Potrebné pre git operácie
+
+      - name: Get Tag Version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Update Project Version
+        run: |
+          # Nájde riadok "## Version: ..." a nahradí ho verziou z tagu
+          sed -i "s/^## Version: .*/## Version: ${{ env.VERSION }}/" SausageAutomsg.toc
+          sed -i "s/local SAUSAGE_VERSION = \".*\"/local SAUSAGE_VERSION = \"${{ env.VERSION }}\"/" SausageAutomsg.lua 
+          sed -i "s/^Version: .*/Version: ${{ env.VERSION }}/" readme.md
+      - name: Commit and Push Version Update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bump version to ${{ env.VERSION }}"
+          
+          # Zistíme názov default vetvy (zvyčajne main alebo master) a pushneme zmenu
+          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+          git push origin HEAD:$DEFAULT_BRANCH || echo "Warning: Could not push to $DEFAULT_BRANCH. Continuing with release."
+
+      - name: Prepare Release ZIP
+        run: |
+          ADDON_NAME="SausageAutomsg"
+          mkdir release_temp
+          # Vytvoríme priečinok s názvom addonu (aby to po rozbalení malo správnu štruktúru pre WoW)
+          mkdir release_temp/$ADDON_NAME
+          
+          # Skopírujeme súbory, vynecháme git veci a temp priečinok
+          rsync -av --exclude='.git*' --exclude='.github' --exclude='release_temp' . release_temp/$ADDON_NAME/
+          
+          # Vytvoríme ZIP archív
+          cd release_temp
+          zip -r ../$ADDON_NAME.zip $ADDON_NAME
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: SausageAutomsg.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
