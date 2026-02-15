@@ -2,7 +2,7 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.1.6"
+local SAUSAGE_VERSION = "1.1.7"
 local ADDON_NAME = "SausageAutomsg"
 
 -- Inicializácia globálnej tabuľky
@@ -45,7 +45,7 @@ local function GetActiveChannelName(index)
             return channels[i] .. ". " .. channels[i+1]
         end
     end
-    return index .. ". (Nepripojený)"
+    return index .. ". (Not connected)"
 end
 
 -- [[ MAIN FRAME ]]
@@ -101,8 +101,8 @@ enableCheck:SetScript("OnClick", function(self)
         local isChecked = self:GetChecked() and true or false
         SausageAutomsgDB.slots[currentTab].enabled = isChecked
         
-        local stateText = isChecked and "|cff00ff00ZAPNUTÁ|r" or "|cffff0000VYPNUTÁ|r"
-        print("|cffffd200Sausage:|r Odosielanie pre Msg " .. currentTab .. " je " .. stateText)
+        local stateText = isChecked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"
+        print("|cffffd200Sausage:|r Broadcasting for Msg " .. currentTab .. " is " .. stateText)
     end
 end)
 
@@ -189,7 +189,7 @@ saveBtn:SetScript("OnClick", function()
         
         editBox:ClearFocus()
         intervalInput:ClearFocus()
-        print("|cffffd200Sausage:|r Nastavenia a text pre Msg " .. currentTab .. " boli úspešne uložené.")
+        print("|cffffd200Sausage:|r Settings and text for Msg " .. currentTab .. " successfully saved.")
     end
 end)
 
@@ -212,7 +212,7 @@ function LoadTab(index)
         if i == index then tabButtons[i]:LockHighlight() else tabButtons[i]:UnlockHighlight() end
     end
     
-    enableCheckText:SetText("|cffffd200Msg " .. index .. "|r - Povoliť odosielanie")
+    enableCheckText:SetText("|cffffd200Msg " .. index .. "|r - Enable broadcasting")
     enableCheck:SetChecked(slot.enabled)
     
     editBox:SetText(slot.text or "")
@@ -287,32 +287,69 @@ startBtn:SetScript("OnClick", function(self)
     self:SetText(isMasterRunning and "MASTER STOP" or "MASTER START")
     if isMasterRunning then
         for i=1, 4 do timers[i] = 999 end
-        print("|cffffd200Sausage:|r Automsg Engine |cff00ff00ZAPNUTÝ|r")
+        print("|cffffd200Sausage:|r Automsg Engine |cff00ff00STARTED|r")
     else
-        print("|cffffd200Sausage:|r Automsg Engine |cffff0000VYPNUTÝ|r")
+        print("|cffffd200Sausage:|r Automsg Engine |cffff0000STOPPED|r")
     end
 end)
 
--- [[ DISCORD POPUP A FOOTER ]]
-StaticPopupDialogs["SAUSAGE_UPDATE_DIALOG"] = {
-    text = "Pridaj sa na náš Discord pre updaty, reporty a ďalšie addony!\n\nStlač Ctrl+C pre skopírovanie linku:",
-    button1 = "Zavrieť",
-    hasEditBox = true,
-    editBoxWidth = 250,
-    OnShow = function(self)
-        self.editBox:SetText("https://discord.com/invite/UMbcfhurew")
-        self.editBox:HighlightText()
-        self.editBox:SetFocus()
-    end,
-    EditBoxOnEscapePressed = function(self)
-        self:GetParent():Hide()
-    end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-}
+-- [[ UPDATE / GITHUB CUSTOM FRAME ]]
+local GitFrame = CreateFrame("Frame", "SausageAutomsgGitFrame", UIParent)
+GitFrame:SetSize(320, 130)
+GitFrame:SetPoint("CENTER")
+GitFrame:SetFrameStrata("DIALOG")
+GitFrame:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 }
+})
+tinsert(UISpecialFrames, "SausageAutomsgGitFrame")
+GitFrame:Hide()
 
+local gitHeader = GitFrame:CreateTexture(nil, "OVERLAY")
+gitHeader:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
+gitHeader:SetSize(250, 64)
+gitHeader:SetPoint("TOP", 0, 12)
+
+local gitTitle = GitFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+gitTitle:SetPoint("TOP", gitHeader, "TOP", 0, -14)
+gitTitle:SetText("UPDATE LINK")
+
+local gitClose = CreateFrame("Button", nil, GitFrame, "UIPanelCloseButton")
+gitClose:SetPoint("TOPRIGHT", -8, -8)
+
+local gitDesc = GitFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+gitDesc:SetPoint("TOP", 0, -35)
+gitDesc:SetText("Press Ctrl+C to copy the GitHub link:")
+
+local gitEditBox = CreateFrame("EditBox", nil, GitFrame, "InputBoxTemplate")
+gitEditBox:SetSize(260, 20)
+gitEditBox:SetPoint("TOP", gitDesc, "BOTTOM", 0, -15)
+gitEditBox:SetAutoFocus(true)
+
+local GITHUB_LINK = "https://github.com/NikowskyWow/SausageAutomsg/releases"
+
+-- Nezničiteľný text skript
+gitEditBox:SetScript("OnTextChanged", function(self)
+    if self:GetText() ~= GITHUB_LINK then
+        self:SetText(GITHUB_LINK)
+        self:HighlightText()
+    end
+end)
+
+gitEditBox:SetScript("OnEscapePressed", function(self)
+    self:ClearFocus()
+    GitFrame:Hide()
+end)
+
+GitFrame:SetScript("OnShow", function()
+    gitEditBox:SetText(GITHUB_LINK)
+    gitEditBox:SetFocus()
+    gitEditBox:HighlightText()
+end)
+
+-- [[ FOOTER ]]
 local verText = MainFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 verText:SetPoint("BOTTOMLEFT", 20, 15)
 verText:SetText("v" .. SAUSAGE_VERSION)
@@ -326,7 +363,7 @@ updateBtn:SetSize(110, 25)
 updateBtn:SetPoint("BOTTOMRIGHT", -20, 15)
 updateBtn:SetText("Check Updates")
 updateBtn:SetScript("OnClick", function()
-    StaticPopup_Show("SAUSAGE_UPDATE_DIALOG")
+    GitFrame:Show()
 end)
 
 -- [[ MINIMAP ICON ]]

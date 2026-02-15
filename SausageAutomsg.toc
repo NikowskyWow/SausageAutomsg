@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: |cffffd200Sausage|r Automsg
-## Notes: Pokročilý automatický vysielač správ. Iba cez minimapu. Obsahuje Discord link.
+## Notes: Advanced auto-messaging utility. Minimap only. English localization.
 ## Author: Sausage Party / Kokotiar
-## Version: 1.1.6
+## Version: 1.1.7
 ## SavedVariables: SausageAutomsgDB
 
 SausageAutomsg.lua
