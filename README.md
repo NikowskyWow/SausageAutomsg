@@ -47,5 +47,6 @@ Join our Discord! Here you will find a dedicated place for support, bug reports,
 * **Game Version:** World of Warcraft: Wrath of the Lich King (3.3.5a)
 * **Tested On:** Warmane (Onyxia)
 
-<img width="489" height="550" alt="Screenshot_1" src="https://github.com/user-attachments/assets/bf72403b-257a-4e06-8614-570ce5be7cc1" />
+
+<img width="454" height="549" alt="Screenshot_1" src="https://github.com/user-attachments/assets/54c4cabf-1c84-477c-a72f-d5a0f635a8a8" />
 
