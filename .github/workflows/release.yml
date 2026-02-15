@@ -29,6 +29,15 @@ jobs:
           sed -i "s/local SAUSAGE_VERSION = \".*\"/local SAUSAGE_VERSION = \"${{ env.VERSION }}\"/" SausageAutomsg.lua 
           sed -i "s/\* \*\*Addon Version:\*\*.*/\* \*\*Addon Version:\*\* ${{ env.VERSION }}/" README.md
 
+      - name: Commit and Push Version Update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # -a pridá všetky zmenené súbory (fixuje chybu "no changes added to commit")
+          git commit -a -m "Bump version to ${{ env.VERSION }}"
+          # Pushneme explicitne do main vetvy (fixuje chybu "HEAD detached")
+          git push origin HEAD:main
+
       - name: Prepare Release ZIP
         run: |
           ADDON_NAME="SausageAutomsg"
