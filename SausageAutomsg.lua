@@ -2,7 +2,7 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.1.4"
+local SAUSAGE_VERSION = "1.1.6"
 local ADDON_NAME = "SausageAutomsg"
 
 -- Inicializácia globálnej tabuľky
@@ -152,7 +152,6 @@ local function CreateChannelCheck(name, defaultLabel, x, y)
     local cb = CreateFrame("CheckButton", "SausageCB_"..name, settingsBox, "UICheckButtonTemplate")
     cb:SetPoint("TOPLEFT", x, y)
     _G[cb:GetName().."Text"]:SetText(defaultLabel)
-    -- Odstránené automatické ukladanie pri kliknutí, ukladá sa až cez Save tlačidlo
     return cb
 end
 
@@ -177,11 +176,8 @@ saveBtn:SetScript("OnClick", function()
     if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
         local slot = SausageAutomsgDB.slots[currentTab]
         
-        -- Uloží text
         slot.text = editBox:GetText()
-        -- Uloží interval
         slot.interval = tonumber(intervalInput:GetText()) or 60
-        -- Uloží kanály
         slot.channels.CH1 = cbCh1:GetChecked() and true or false
         slot.channels.CH2 = cbCh2:GetChecked() and true or false
         slot.channels.CH3 = cbCh3:GetChecked() and true or false
@@ -297,7 +293,26 @@ startBtn:SetScript("OnClick", function(self)
     end
 end)
 
--- [[ FOOTER ]]
+-- [[ DISCORD POPUP A FOOTER ]]
+StaticPopupDialogs["SAUSAGE_UPDATE_DIALOG"] = {
+    text = "Pridaj sa na náš Discord pre updaty, reporty a ďalšie addony!\n\nStlač Ctrl+C pre skopírovanie linku:",
+    button1 = "Zavrieť",
+    hasEditBox = true,
+    editBoxWidth = 250,
+    OnShow = function(self)
+        self.editBox:SetText("https://discord.com/invite/UMbcfhurew")
+        self.editBox:HighlightText()
+        self.editBox:SetFocus()
+    end,
+    EditBoxOnEscapePressed = function(self)
+        self:GetParent():Hide()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
 local verText = MainFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 verText:SetPoint("BOTTOMLEFT", 20, 15)
 verText:SetText("v" .. SAUSAGE_VERSION)
@@ -310,6 +325,9 @@ local updateBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
 updateBtn:SetSize(110, 25)
 updateBtn:SetPoint("BOTTOMRIGHT", -20, 15)
 updateBtn:SetText("Check Updates")
+updateBtn:SetScript("OnClick", function()
+    StaticPopup_Show("SAUSAGE_UPDATE_DIALOG")
+end)
 
 -- [[ MINIMAP ICON ]]
 local MinimapBtn = CreateFrame("Button", "SausageAutomsgMinimap", Minimap)
@@ -376,10 +394,3 @@ MainFrame:SetScript("OnEvent", function(self, event, addon)
         self:UnregisterEvent("ADDON_LOADED")
     end
 end)
-
--- [[ SLASH COMMANDS ]]
-SLASH_SAUSAGEAUTOMSG1 = "/sam"
-SLASH_SAUSAGEAUTOMSG2 = "/automsg"
-SlashCmdList["SAUSAGEAUTOMSG"] = function()
-    if MainFrame:IsShown() then MainFrame:Hide() else MainFrame:Show() end
-end

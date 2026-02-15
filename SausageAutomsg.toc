@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: |cffffd200Sausage|r Automsg
-## Notes: Pokročilý automatický vysielač správ s oddeleným ovládaním (On/Off).
+## Notes: Pokročilý automatický vysielač správ. Iba cez minimapu. Obsahuje Discord link.
 ## Author: Sausage Party / Kokotiar
-## Version: 1.1.4
+## Version: 1.1.6
 ## SavedVariables: SausageAutomsgDB
 
 SausageAutomsg.lua
