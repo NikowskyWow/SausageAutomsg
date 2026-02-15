@@ -2,28 +2,39 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.0.3"
+local SAUSAGE_VERSION = "1.1.1"
 local ADDON_NAME = "SausageAutomsg"
 
--- Saved Variables Setup
-SausageAutomsgDB = SausageAutomsgDB or {
-    savedText = "",
+-- Default Settings Setup
+local defaultSlot = {
+    enabled = false,
+    text = "",
     interval = 60,
-    channels = {
-        ["TRADE"] = true,
-        ["LFG"] = false,
-        ["GUILD"] = false,
-        ["SAY"] = false,
-    },
-    minimapPos = 45
+    channels = { SAY = false, YELL = false, CH1 = false, CH2 = false, CH3 = false, CH4 = false, CH5 = false, CH6 = false }
 }
 
-local isRunning = false
-local lastSent = 0
+SausageAutomsgDB = SausageAutomsgDB or {
+    minimapPos = 45,
+    slots = {
+        [1] = CopyTable(defaultSlot),
+        [2] = CopyTable(defaultSlot),
+        [3] = CopyTable(defaultSlot),
+        [4] = CopyTable(defaultSlot)
+    }
+}
+
+-- Uistenie sa, že staré DB štruktúry sú aktualizované (prevencia chýb)
+if not SausageAutomsgDB.slots then
+    SausageAutomsgDB.slots = { CopyTable(defaultSlot), CopyTable(defaultSlot), CopyTable(defaultSlot), CopyTable(defaultSlot) }
+end
+
+local currentTab = 1
+local isMasterRunning = false
+local timers = {0, 0, 0, 0}
 
 -- [[ UI UTILS ]]
 local function CreateSausageBackdrop(frame, borderType)
-    local borderColor = {0.6, 0.6, 0.6, 1} -- Default Gray
+    local borderColor = {0.6, 0.6, 0.6, 1}
     if borderType == "GOLD" then borderColor = {1, 0.8, 0, 1}
     elseif borderType == "BLUE" then borderColor = {0, 0.7, 1, 1} end
 
@@ -37,9 +48,19 @@ local function CreateSausageBackdrop(frame, borderType)
     frame:SetBackdropBorderColor(unpack(borderColor))
 end
 
+local function GetActiveChannelName(index)
+    local channels = {GetChannelList()}
+    for i = 1, #channels, 2 do
+        if channels[i] == index then
+            return channels[i] .. ". " .. channels[i+1]
+        end
+    end
+    return index .. ". (Nepripojený)"
+end
+
 -- [[ MAIN FRAME ]]
 local MainFrame = CreateFrame("Frame", "SausageAutomsgFrame", UIParent)
-MainFrame:SetSize(400, 450)
+MainFrame:SetSize(420, 500)
 MainFrame:SetPoint("CENTER")
 MainFrame:SetMovable(true)
 MainFrame:EnableMouse(true)
@@ -58,23 +79,49 @@ MainFrame:Hide()
 -- Header
 local header = MainFrame:CreateTexture(nil, "OVERLAY")
 header:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Header")
-header:SetSize(300, 64)
+header:SetSize(320, 64)
 header:SetPoint("TOP", 0, 12)
 
 local title = MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 title:SetPoint("TOP", header, "TOP", 0, -14)
 title:SetText("SAUSAGE AUTOMSG")
 
--- Close Button
 local closeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelCloseButton")
 closeBtn:SetPoint("TOPRIGHT", -8, -8)
 
+-- [[ TABS ]]
+local tabButtons = {}
+for i = 1, 4 do
+    local btn = CreateFrame("Button", "SausageTab"..i, MainFrame, "UIPanelButtonTemplate")
+    btn:SetSize(80, 25)
+    btn:SetPoint("TOPLEFT", 18 + ((i-1)*90), -40)
+    btn:SetText("Msg " .. i)
+    btn:SetScript("OnClick", function() LoadTab(i) end)
+    tabButtons[i] = btn
+end
+
+-- Enable Checkbox pre aktuálny Tab
+local enableCheck = CreateFrame("CheckButton", "SausageEnableCheck", MainFrame, "UICheckButtonTemplate")
+enableCheck:SetPoint("TOPLEFT", 25, -75)
+local enableCheckText = enableCheck:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+enableCheckText:SetPoint("LEFT", enableCheck, "RIGHT", 5, 0)
+enableCheck:SetScript("OnClick", function(self)
+    SausageAutomsgDB.slots[currentTab].enabled = self:GetChecked()
+end)
+
 -- [[ CONTENT BOXES ]]
--- Message Input Box
+-- Message Input Box (Click-fix applied)
 local msgContainer = CreateFrame("Frame", nil, MainFrame)
-msgContainer:SetSize(360, 120)
-msgContainer:SetPoint("TOP", 0, -60)
+msgContainer:SetSize(370, 120)
+msgContainer:SetPoint("TOP", 0, -110)
 CreateSausageBackdrop(msgContainer, "BLUE")
+msgContainer:EnableMouse(true)
+
+-- Manual Save Button (Fail-safe)
+local saveBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+saveBtn:SetSize(100, 25)
+saveBtn:SetPoint("TOPRIGHT", msgContainer, "TOPRIGHT", 0, 30)
+saveBtn:SetText("Save Text")
 
 local scrollFrame = CreateFrame("ScrollFrame", "SausageAutomsgScroll", msgContainer, "UIPanelScrollFrameTemplate")
 scrollFrame:SetPoint("TOPLEFT", 8, -8)
@@ -84,17 +131,26 @@ local editBox = CreateFrame("EditBox", nil, scrollFrame)
 editBox:SetMultiLine(true)
 editBox:SetMaxLetters(255)
 editBox:SetFontObject(ChatFontNormal)
-editBox:SetWidth(320)
+editBox:SetWidth(330)
 scrollFrame:SetScrollChild(editBox)
+
+-- Click-fix: Kliknutie na modré pozadie aktivuje EditBox
+msgContainer:SetScript("OnMouseDown", function() editBox:SetFocus() end)
 editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+-- Nastavenie ukladania textu na manualne tlacitko (Auto-save odstraneny)
+saveBtn:SetScript("OnClick", function()
+    SausageAutomsgDB.slots[currentTab].text = editBox:GetText()
+    print("|cffffd200Sausage:|r Text pre Msg " .. currentTab .. " bol úspešne uložený.")
+end)
 
 -- Settings Box (Interval & Channels)
 local settingsBox = CreateFrame("Frame", nil, MainFrame)
-settingsBox:SetSize(360, 140)
+settingsBox:SetSize(370, 180)
 settingsBox:SetPoint("TOP", msgContainer, "BOTTOM", 0, -10)
 CreateSausageBackdrop(settingsBox, "GRAY")
 
--- Interval Label & Input
+-- Interval
 local intervalLabel = settingsBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 intervalLabel:SetPoint("TOPLEFT", 15, -15)
 intervalLabel:SetText("Interval (seconds):")
@@ -106,75 +162,121 @@ intervalInput:SetNumeric(true)
 intervalInput:SetAutoFocus(false)
 intervalInput:SetScript("OnTextChanged", function(self)
     local val = tonumber(self:GetText())
-    if val then SausageAutomsgDB.interval = val end
+    if val then SausageAutomsgDB.slots[currentTab].interval = val end
 end)
 
--- Channels Checkboxes
-local function CreateChannelCheck(name, label, x, y)
+-- Channels Checkboxes Setup
+local function CreateChannelCheck(name, defaultLabel, x, y)
     local cb = CreateFrame("CheckButton", "SausageCB_"..name, settingsBox, "UICheckButtonTemplate")
     cb:SetPoint("TOPLEFT", x, y)
-    _G[cb:GetName().."Text"]:SetText(label)
-    cb:SetScript("OnClick", function(self) SausageAutomsgDB.channels[name] = self:GetChecked() end)
+    _G[cb:GetName().."Text"]:SetText(defaultLabel)
+    cb:SetScript("OnClick", function(self) 
+        SausageAutomsgDB.slots[currentTab].channels[name] = self:GetChecked() 
+    end)
     return cb
 end
 
-local cbTrade = CreateChannelCheck("TRADE", "Trade (2)", 15, -45)
-local cbLFG = CreateChannelCheck("LFG", "LFG (4)", 100, -45)
-local cbGuild = CreateChannelCheck("GUILD", "Guild", 15, -75)
-local cbSay = CreateChannelCheck("SAY", "Say", 100, -75)
+-- 2 Stĺpce kanálov
+local cbCh1 = CreateChannelCheck("CH1", "Channel 1", 15, -45)
+local cbCh2 = CreateChannelCheck("CH2", "Channel 2", 15, -70)
+local cbCh3 = CreateChannelCheck("CH3", "Channel 3", 15, -95)
+local cbCh4 = CreateChannelCheck("CH4", "Channel 4", 15, -120)
 
--- [[ LOGIC ]]
-local function SendAdvert()
-    local text = editBox:GetText()
+local cbCh5 = CreateChannelCheck("CH5", "Channel 5", 180, -45)
+local cbCh6 = CreateChannelCheck("CH6", "Channel 6", 180, -70)
+local cbSay = CreateChannelCheck("SAY", "Say", 180, -95)
+local cbYell = CreateChannelCheck("YELL", "Yell", 180, -120)
+
+-- Obnova UI pri prepnutí Tabu
+function LoadTab(index)
+    currentTab = index
+    local slot = SausageAutomsgDB.slots[index]
+    
+    -- Highlight Active Tab
+    for i=1, 4 do
+        if i == index then tabButtons[i]:LockHighlight() else tabButtons[i]:UnlockHighlight() end
+    end
+    
+    enableCheckText:SetText("|cffffd200Msg " .. index .. "|r - Povoliť odosielanie")
+    enableCheck:SetChecked(slot.enabled)
+    editBox:SetText(slot.text or "")
+    intervalInput:SetText(slot.interval or 60)
+    
+    -- Update Dynamických mien kanálov
+    _G["SausageCB_CH1Text"]:SetText(GetActiveChannelName(1))
+    _G["SausageCB_CH2Text"]:SetText(GetActiveChannelName(2))
+    _G["SausageCB_CH3Text"]:SetText(GetActiveChannelName(3))
+    _G["SausageCB_CH4Text"]:SetText(GetActiveChannelName(4))
+    _G["SausageCB_CH5Text"]:SetText(GetActiveChannelName(5))
+    _G["SausageCB_CH6Text"]:SetText(GetActiveChannelName(6))
+    
+    cbCh1:SetChecked(slot.channels.CH1)
+    cbCh2:SetChecked(slot.channels.CH2)
+    cbCh3:SetChecked(slot.channels.CH3)
+    cbCh4:SetChecked(slot.channels.CH4)
+    cbCh5:SetChecked(slot.channels.CH5)
+    cbCh6:SetChecked(slot.channels.CH6)
+    cbSay:SetChecked(slot.channels.SAY)
+    cbYell:SetChecked(slot.channels.YELL)
+end
+
+MainFrame:SetScript("OnShow", function() LoadTab(currentTab) end)
+
+-- [[ ENGINE - LOGIKA ODOSIELANIA ]]
+local function SendSlotAdvert(slotIndex)
+    local slot = SausageAutomsgDB.slots[slotIndex]
+    local text = slot.text
     if text == "" then return end
 
-    local channels = SausageAutomsgDB.channels
-    if channels.SAY then SendChatMessage(text, "SAY") end
-    if channels.GUILD and IsInGuild() then SendChatMessage(text, "GUILD") end
+    if slot.channels.SAY then SendChatMessage(text, "SAY") end
+    if slot.channels.YELL then SendChatMessage(text, "YELL") end
     
-    -- Warmane Global Channels (Dynamic ID search)
-    if channels.TRADE then
-        local id = GetChannelName("Trade - City")
-        if id > 0 then SendChatMessage(text, "CHANNEL", nil, id) end
-    end
-    if channels.LFG then
-        local id = GetChannelName("LookingForGroup")
-        if id > 0 then SendChatMessage(text, "CHANNEL", nil, id) end
+    -- Kontrola Global Kanálov 1-6
+    local activeChannels = {GetChannelList()}
+    for chNum = 1, 6 do
+        if slot.channels["CH"..chNum] then
+            for i = 1, #activeChannels, 2 do
+                if activeChannels[i] == chNum then
+                    SendChatMessage(text, "CHANNEL", nil, chNum)
+                    break
+                end
+            end
+        end
     end
 end
 
--- Engine
 local EngineFrame = CreateFrame("Frame")
 EngineFrame:SetScript("OnUpdate", function(self, elapsed)
-    if not isRunning then return end
-    lastSent = lastSent + elapsed
-    local interval = tonumber(SausageAutomsgDB.interval) or 60
+    if not isMasterRunning then return end
     
-    if lastSent >= interval then
-        SendAdvert()
-        lastSent = 0
+    for i = 1, 4 do
+        local slot = SausageAutomsgDB.slots[i]
+        if slot.enabled and slot.text ~= "" then
+            timers[i] = timers[i] + elapsed
+            local interval = tonumber(slot.interval) or 60
+            
+            if timers[i] >= interval then
+                SendSlotAdvert(i)
+                timers[i] = 0
+            end
+        end
     end
 end)
 
--- [[ BUTTONS ]]
+-- [[ MASTER START/STOP BUTTON ]]
 local startBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-startBtn:SetSize(120, 30)
-startBtn:SetPoint("BOTTOMLEFT", 25, 50)
-startBtn:SetText("START")
+startBtn:SetSize(140, 35)
+startBtn:SetPoint("BOTTOMLEFT", 25, 45)
+startBtn:SetText("MASTER START")
 startBtn:SetScript("OnClick", function(self)
-    isRunning = not isRunning
-    self:SetText(isRunning and "STOP" or "START")
-    lastSent = 999 -- Okamžité odoslanie pri štarte
-    print("|cffffd200Sausage:|r Automsg is now " .. (isRunning and "|cff00ff00Running|r" or "|cffff0000Stopped|r"))
-end)
-
-local saveBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-saveBtn:SetSize(100, 25)
-saveBtn:SetPoint("TOPRIGHT", msgContainer, "TOPRIGHT", 0, 30)
-saveBtn:SetText("Save Text")
-saveBtn:SetScript("OnClick", function()
-    SausageAutomsgDB.savedText = editBox:GetText()
-    print("|cffffd200Sausage:|r Text uložený.")
+    isMasterRunning = not isMasterRunning
+    self:SetText(isMasterRunning and "MASTER STOP" or "MASTER START")
+    if isMasterRunning then
+        for i=1, 4 do timers[i] = 999 end -- Spustí vybrané správy okamžite
+        print("|cffffd200Sausage:|r Automsg Engine |cff00ff00ZAPNUTÝ|r")
+    else
+        print("|cffffd200Sausage:|r Automsg Engine |cffff0000VYPNUTÝ|r")
+    end
 end)
 
 -- [[ FOOTER ]]
@@ -235,13 +337,8 @@ end)
 MainFrame:RegisterEvent("ADDON_LOADED")
 MainFrame:SetScript("OnEvent", function(self, event, addon)
     if addon == ADDON_NAME then
-        intervalInput:SetText(SausageAutomsgDB.interval or 60)
-        cbTrade:SetChecked(SausageAutomsgDB.channels.TRADE)
-        cbLFG:SetChecked(SausageAutomsgDB.channels.LFG)
-        cbGuild:SetChecked(SausageAutomsgDB.channels.GUILD)
-        cbSay:SetChecked(SausageAutomsgDB.channels.SAY)
-        if SausageAutomsgDB.savedText then editBox:SetText(SausageAutomsgDB.savedText) end
         UpdateMinimapPos()
+        LoadTab(1) -- Načíta prvý slot pri zapnutí
         self:UnregisterEvent("ADDON_LOADED")
     end
 end)

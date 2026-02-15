@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: |cffffd200Sausage|r Automsg
-## Notes: Automatický vysielač správ do kanálov s presetmi a časovačom.
+## Notes: Pokročilý automatický vysielač 4 nezávislých správ (s manuálnym ukladaním).
 ## Author: Sausage Party / Kokotiar
-## Version: 1.0.2
+## Version: 1.1.1
 ## SavedVariables: SausageAutomsgDB
 
 SausageAutomsg.lua
