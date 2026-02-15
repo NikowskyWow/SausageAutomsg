@@ -2,35 +2,25 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.1.1"
+local SAUSAGE_VERSION = "1.1.2"
 local ADDON_NAME = "SausageAutomsg"
 
--- Default Settings Setup
-local defaultSlot = {
-    enabled = false,
-    text = "",
-    interval = 60,
-    channels = { SAY = false, YELL = false, CH1 = false, CH2 = false, CH3 = false, CH4 = false, CH5 = false, CH6 = false }
-}
-
-SausageAutomsgDB = SausageAutomsgDB or {
-    minimapPos = 45,
-    slots = {
-        [1] = CopyTable(defaultSlot),
-        [2] = CopyTable(defaultSlot),
-        [3] = CopyTable(defaultSlot),
-        [4] = CopyTable(defaultSlot)
-    }
-}
-
--- Uistenie sa, že staré DB štruktúry sú aktualizované (prevencia chýb)
-if not SausageAutomsgDB.slots then
-    SausageAutomsgDB.slots = { CopyTable(defaultSlot), CopyTable(defaultSlot), CopyTable(defaultSlot), CopyTable(defaultSlot) }
-end
+-- Inicializácia globálnej tabuľky, aby sme sa vyhli nil chybám, kým hra načíta WTF
+SausageAutomsgDB = SausageAutomsgDB or {}
 
 local currentTab = 1
 local isMasterRunning = false
 local timers = {0, 0, 0, 0}
+
+-- Helper funkcia na generovanie čistého slotu (nepriestrelné riešenie proti starým DB)
+local function GetDefaultSlot()
+    return {
+        enabled = false,
+        text = "",
+        interval = 60,
+        channels = { SAY = false, YELL = false, CH1 = false, CH2 = false, CH3 = false, CH4 = false, CH5 = false, CH6 = false }
+    }
+end
 
 -- [[ UI UTILS ]]
 local function CreateSausageBackdrop(frame, borderType)
@@ -110,7 +100,7 @@ enableCheck:SetScript("OnClick", function(self)
 end)
 
 -- [[ CONTENT BOXES ]]
--- Message Input Box (Click-fix applied)
+-- Message Input Box
 local msgContainer = CreateFrame("Frame", nil, MainFrame)
 msgContainer:SetSize(370, 120)
 msgContainer:SetPoint("TOP", 0, -110)
@@ -138,10 +128,12 @@ scrollFrame:SetScrollChild(editBox)
 msgContainer:SetScript("OnMouseDown", function() editBox:SetFocus() end)
 editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
--- Nastavenie ukladania textu na manualne tlacitko (Auto-save odstraneny)
+-- Nastavenie ukladania textu na manuálne tlačidlo (Auto-save odstránený)
 saveBtn:SetScript("OnClick", function()
-    SausageAutomsgDB.slots[currentTab].text = editBox:GetText()
-    print("|cffffd200Sausage:|r Text pre Msg " .. currentTab .. " bol úspešne uložený.")
+    if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
+        SausageAutomsgDB.slots[currentTab].text = editBox:GetText()
+        print("|cffffd200Sausage:|r Text pre Msg " .. currentTab .. " bol úspešne uložený.")
+    end
 end)
 
 -- Settings Box (Interval & Channels)
@@ -162,7 +154,9 @@ intervalInput:SetNumeric(true)
 intervalInput:SetAutoFocus(false)
 intervalInput:SetScript("OnTextChanged", function(self)
     local val = tonumber(self:GetText())
-    if val then SausageAutomsgDB.slots[currentTab].interval = val end
+    if val and SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then 
+        SausageAutomsgDB.slots[currentTab].interval = val 
+    end
 end)
 
 -- Channels Checkboxes Setup
@@ -171,7 +165,9 @@ local function CreateChannelCheck(name, defaultLabel, x, y)
     cb:SetPoint("TOPLEFT", x, y)
     _G[cb:GetName().."Text"]:SetText(defaultLabel)
     cb:SetScript("OnClick", function(self) 
-        SausageAutomsgDB.slots[currentTab].channels[name] = self:GetChecked() 
+        if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
+            SausageAutomsgDB.slots[currentTab].channels[name] = self:GetChecked() 
+        end
     end)
     return cb
 end
@@ -189,6 +185,9 @@ local cbYell = CreateChannelCheck("YELL", "Yell", 180, -120)
 
 -- Obnova UI pri prepnutí Tabu
 function LoadTab(index)
+    -- Ochrana, ak by sloty ešte neboli načítané (fail-safe)
+    if type(SausageAutomsgDB.slots) ~= "table" or not SausageAutomsgDB.slots[index] then return end
+
     currentTab = index
     local slot = SausageAutomsgDB.slots[index]
     
@@ -247,11 +246,11 @@ end
 
 local EngineFrame = CreateFrame("Frame")
 EngineFrame:SetScript("OnUpdate", function(self, elapsed)
-    if not isMasterRunning then return end
+    if not isMasterRunning or type(SausageAutomsgDB.slots) ~= "table" then return end
     
     for i = 1, 4 do
         local slot = SausageAutomsgDB.slots[i]
-        if slot.enabled and slot.text ~= "" then
+        if slot and slot.enabled and slot.text ~= "" then
             timers[i] = timers[i] + elapsed
             local interval = tonumber(slot.interval) or 60
             
@@ -333,12 +332,34 @@ MinimapBtn:SetScript("OnClick", function(self, btn)
     end
 end)
 
--- [[ INITIALIZATION ]]
+-- [[ INITIALIZATION (The Bug Fix) ]]
 MainFrame:RegisterEvent("ADDON_LOADED")
 MainFrame:SetScript("OnEvent", function(self, event, addon)
     if addon == ADDON_NAME then
+        
+        -- 1. Bezpečné do-načítanie / vytvorenie DB až po tom, čo hra prečíta WTF zložku
+        SausageAutomsgDB.minimapPos = SausageAutomsgDB.minimapPos or 45
+        
+        if type(SausageAutomsgDB.slots) ~= "table" then
+            -- Ak DB neexistuje, alebo bola prepísaná starou verziou bez "slots", vytvor 4 nové sloty
+            SausageAutomsgDB.slots = { GetDefaultSlot(), GetDefaultSlot(), GetDefaultSlot(), GetDefaultSlot() }
+        else
+            -- Ďalší Fail-Safe: ak by tabuľka bola poškodená a chýbali v nej konkrétne sloty 1-4
+            for i = 1, 4 do
+                if type(SausageAutomsgDB.slots[i]) ~= "table" then
+                    SausageAutomsgDB.slots[i] = GetDefaultSlot()
+                else
+                    -- Oprava, ak by chýbala pod-tabuľka kanálov (z úplne starej verzie)
+                    if type(SausageAutomsgDB.slots[i].channels) ~= "table" then
+                        SausageAutomsgDB.slots[i].channels = GetDefaultSlot().channels
+                    end
+                end
+            end
+        end
+
+        -- 2. Aktualizácia UI
         UpdateMinimapPos()
-        LoadTab(1) -- Načíta prvý slot pri zapnutí
+        LoadTab(1) -- Načíta prvý slot pri zapnutí bezpečne
         self:UnregisterEvent("ADDON_LOADED")
     end
 end)

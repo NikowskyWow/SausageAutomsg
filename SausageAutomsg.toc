@@ -2,7 +2,7 @@
 ## Title: |cffffd200Sausage|r Automsg
 ## Notes: Pokročilý automatický vysielač 4 nezávislých správ (s manuálnym ukladaním).
 ## Author: Sausage Party / Kokotiar
-## Version: 1.1.1
+## Version: 1.1.2
 ## SavedVariables: SausageAutomsgDB
 
 SausageAutomsg.lua
