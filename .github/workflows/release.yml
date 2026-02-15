@@ -27,16 +27,8 @@ jobs:
           # Nájde riadok "## Version: ..." a nahradí ho verziou z tagu
           sed -i "s/^## Version: .*/## Version: ${{ env.VERSION }}/" SausageAutomsg.toc
           sed -i "s/local SAUSAGE_VERSION = \".*\"/local SAUSAGE_VERSION = \"${{ env.VERSION }}\"/" SausageAutomsg.lua 
-          sed -i "s/^Version: .*/Version: ${{ env.VERSION }}/" readme.md
-      - name: Commit and Push Version Update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Bump version to ${{ env.VERSION }}"
-          
-          # Zistíme názov default vetvy (zvyčajne main alebo master) a pushneme zmenu
-          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-          git push origin HEAD:$DEFAULT_BRANCH || echo "Warning: Could not push to $DEFAULT_BRANCH. Continuing with release."
+          # Oprava názvu súboru (README.md) a regexu podľa obsahu tvojho súboru
+          sed -i "s/\* \*\*Addon Version:\*\*.*/\* \*\*Addon Version:\*\* ${{ env.VERSION }}/" README.md
 
       - name: Prepare Release ZIP
         run: |
