@@ -27,29 +27,35 @@ jobs:
           # Nájde riadok "## Version: ..." a nahradí ho verziou z tagu
           sed -i "s/^## Version: .*/## Version: ${{ env.VERSION }}/" SausageAutomsg.toc
           sed -i "s/local SAUSAGE_VERSION = \".*\"/local SAUSAGE_VERSION = \"${{ env.VERSION }}\"/" SausageAutomsg.lua 
-          # Oprava názvu súboru (README.md) a regexu podľa obsahu tvojho súboru
           sed -i "s/\* \*\*Addon Version:\*\*.*/\* \*\*Addon Version:\*\* ${{ env.VERSION }}/" README.md
+      - name: Commit and Push Version Update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bump version to ${{ env.VERSION }}"
+          
+          # Zistíme názov default vetvy (zvyčajne main alebo master) a pushneme zmenu
+          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+          git push origin HEAD:$DEFAULT_BRANCH || echo "Warning: Could not push to $DEFAULT_BRANCH. Continuing with release."
 
       - name: Prepare Release ZIP
         run: |
-          ADDON_NAME="SausageAutomsg"
+          REPO_NAME=${{ github.event.repository.name }}
           mkdir release_temp
           # Vytvoríme priečinok s názvom addonu (aby to po rozbalení malo správnu štruktúru pre WoW)
-          mkdir release_temp/$ADDON_NAME
+          mkdir release_temp/$REPO_NAME
           
           # Skopírujeme súbory, vynecháme git veci a temp priečinok
-          rsync -av --exclude='.git*' --exclude='.github' --exclude='release_temp' . release_temp/$ADDON_NAME/
+          rsync -av --exclude='.git*' --exclude='.github' --exclude='release_temp' . release_temp/$REPO_NAME/
           
           # Vytvoríme ZIP archív
           cd release_temp
-          zip -r ../$ADDON_NAME.zip $ADDON_NAME
+          zip -r ../$REPO_NAME.zip $REPO_NAME
           cd ..
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION }}
-          name: Release ${{ env.VERSION }}
-          files: SausageAutomsg.zip
+          files: ${{ github.event.repository.name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
