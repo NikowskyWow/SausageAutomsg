@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: |cffffd200Sausage|r Automsg
-## Notes: Pokročilý automatický vysielač 4 nezávislých správ (s manuálnym ukladaním).
+## Notes: Pokročilý automatický vysielač správ s oddeleným ovládaním (On/Off).
 ## Author: Sausage Party / Kokotiar
-## Version: 1.1.2
+## Version: 1.1.4
 ## SavedVariables: SausageAutomsgDB
 
 SausageAutomsg.lua

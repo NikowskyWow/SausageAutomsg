@@ -2,7 +2,7 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.1.3"
+local SAUSAGE_VERSION = "1.1.4"
 local ADDON_NAME = "SausageAutomsg"
 
 -- Inicializácia globálnej tabuľky
@@ -90,14 +90,19 @@ for i = 1, 4 do
     tabButtons[i] = btn
 end
 
--- Enable Checkbox pre aktuálny Tab
+-- NEZÁVISLÝ VYPÍNAČ (Enable Checkbox)
 local enableCheck = CreateFrame("CheckButton", "SausageEnableCheck", MainFrame, "UICheckButtonTemplate")
 enableCheck:SetPoint("TOPLEFT", 25, -75)
 local enableCheckText = enableCheck:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 enableCheckText:SetPoint("LEFT", enableCheck, "RIGHT", 5, 0)
+
 enableCheck:SetScript("OnClick", function(self)
     if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
-        SausageAutomsgDB.slots[currentTab].enabled = self:GetChecked()
+        local isChecked = self:GetChecked() and true or false
+        SausageAutomsgDB.slots[currentTab].enabled = isChecked
+        
+        local stateText = isChecked and "|cff00ff00ZAPNUTÁ|r" or "|cffff0000VYPNUTÁ|r"
+        print("|cffffd200Sausage:|r Odosielanie pre Msg " .. currentTab .. " je " .. stateText)
     end
 end)
 
@@ -108,12 +113,6 @@ msgContainer:SetSize(370, 120)
 msgContainer:SetPoint("TOP", 0, -110)
 CreateSausageBackdrop(msgContainer, "BLUE")
 msgContainer:EnableMouse(true)
-
--- Manual Save Button
-local saveBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-saveBtn:SetSize(100, 25)
-saveBtn:SetPoint("TOPRIGHT", msgContainer, "TOPRIGHT", 0, 30)
-saveBtn:SetText("Save Text")
 
 local scrollFrame = CreateFrame("ScrollFrame", "SausageAutomsgScroll", msgContainer, "UIPanelScrollFrameTemplate")
 scrollFrame:SetPoint("TOPLEFT", 8, -8)
@@ -127,28 +126,8 @@ editBox:SetWidth(330)
 editBox:SetAutoFocus(false)
 scrollFrame:SetScrollChild(editBox)
 
--- Oprava pre ESC a focus
 msgContainer:SetScript("OnMouseDown", function() editBox:SetFocus() end)
-editBox:SetScript("OnEscapePressed", function(self) 
-    self:ClearFocus() 
-end)
-
--- Ukladanie textu
-saveBtn:SetScript("OnClick", function()
-    if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
-        SausageAutomsgDB.slots[currentTab].text = editBox:GetText()
-        editBox:ClearFocus()
-        print("|cffffd200Sausage:|r Text pre Msg " .. currentTab .. " bol úspešne uložený.")
-    end
-end)
-
--- Linkovanie itemov (Shift-Click do EditBoxu)
-hooksecurefunc("ChatEdit_InsertLink", function(text)
-    if MainFrame:IsShown() and editBox:HasFocus() then
-        editBox:Insert(text)
-        return true
-    end
-end)
+editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
 -- Settings Box (Interval & Channels)
 local settingsBox = CreateFrame("Frame", nil, MainFrame)
@@ -167,23 +146,13 @@ intervalInput:SetPoint("LEFT", intervalLabel, "RIGHT", 10, 0)
 intervalInput:SetNumeric(true)
 intervalInput:SetAutoFocus(false)
 intervalInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-intervalInput:SetScript("OnTextChanged", function(self)
-    local val = tonumber(self:GetText())
-    if val and SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then 
-        SausageAutomsgDB.slots[currentTab].interval = val 
-    end
-end)
 
 -- Channels Checkboxes Setup
 local function CreateChannelCheck(name, defaultLabel, x, y)
     local cb = CreateFrame("CheckButton", "SausageCB_"..name, settingsBox, "UICheckButtonTemplate")
     cb:SetPoint("TOPLEFT", x, y)
     _G[cb:GetName().."Text"]:SetText(defaultLabel)
-    cb:SetScript("OnClick", function(self) 
-        if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
-            SausageAutomsgDB.slots[currentTab].channels[name] = self:GetChecked() 
-        end
-    end)
+    -- Odstránené automatické ukladanie pri kliknutí, ukladá sa až cez Save tlačidlo
     return cb
 end
 
@@ -198,6 +167,44 @@ local cbCh6 = CreateChannelCheck("CH6", "Channel 6", 180, -70)
 local cbSay = CreateChannelCheck("SAY", "Say", 180, -95)
 local cbYell = CreateChannelCheck("YELL", "Yell", 180, -120)
 
+-- MASTER SAVE TLAČIDLO
+local saveBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+saveBtn:SetSize(100, 25)
+saveBtn:SetPoint("TOPRIGHT", msgContainer, "TOPRIGHT", 0, 30)
+saveBtn:SetText("Save Text")
+
+saveBtn:SetScript("OnClick", function()
+    if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
+        local slot = SausageAutomsgDB.slots[currentTab]
+        
+        -- Uloží text
+        slot.text = editBox:GetText()
+        -- Uloží interval
+        slot.interval = tonumber(intervalInput:GetText()) or 60
+        -- Uloží kanály
+        slot.channels.CH1 = cbCh1:GetChecked() and true or false
+        slot.channels.CH2 = cbCh2:GetChecked() and true or false
+        slot.channels.CH3 = cbCh3:GetChecked() and true or false
+        slot.channels.CH4 = cbCh4:GetChecked() and true or false
+        slot.channels.CH5 = cbCh5:GetChecked() and true or false
+        slot.channels.CH6 = cbCh6:GetChecked() and true or false
+        slot.channels.SAY = cbSay:GetChecked() and true or false
+        slot.channels.YELL = cbYell:GetChecked() and true or false
+        
+        editBox:ClearFocus()
+        intervalInput:ClearFocus()
+        print("|cffffd200Sausage:|r Nastavenia a text pre Msg " .. currentTab .. " boli úspešne uložené.")
+    end
+end)
+
+-- Linkovanie itemov (Shift-Click do EditBoxu)
+hooksecurefunc("ChatEdit_InsertLink", function(text)
+    if MainFrame:IsShown() and editBox:HasFocus() then
+        editBox:Insert(text)
+        return true
+    end
+end)
+
 -- Obnova UI pri prepnutí Tabu
 function LoadTab(index)
     if type(SausageAutomsgDB.slots) ~= "table" or not SausageAutomsgDB.slots[index] then return end
@@ -211,6 +218,7 @@ function LoadTab(index)
     
     enableCheckText:SetText("|cffffd200Msg " .. index .. "|r - Povoliť odosielanie")
     enableCheck:SetChecked(slot.enabled)
+    
     editBox:SetText(slot.text or "")
     intervalInput:SetText(slot.interval or 60)
     
