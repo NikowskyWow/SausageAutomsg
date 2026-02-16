@@ -43,7 +43,7 @@ Join our Discord! Here you will find a dedicated place for support, bug reports,
 ---
 
 ## 📌 Technical Specifications
-* **Addon Version:** 1.1.0
+* **Addon Version:** 1.1.1
 * **Game Version:** World of Warcraft: Wrath of the Lich King (3.3.5a)
 * **Tested On:** Warmane (Onyxia)
 

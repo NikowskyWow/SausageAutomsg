@@ -2,7 +2,7 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "@project-version@"
+local SAUSAGE_VERSION = "1.1.1"
 local ADDON_NAME = "SausageAutomsg"
 
 -- Inicializácia globálnej tabuľky
