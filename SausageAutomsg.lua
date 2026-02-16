@@ -2,7 +2,7 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.1.7"
+local SAUSAGE_VERSION = "1.1.8"
 local ADDON_NAME = "SausageAutomsg"
 
 -- Inicializácia globálnej tabuľky
@@ -11,6 +11,7 @@ SausageAutomsgDB = SausageAutomsgDB or {}
 local currentTab = 1
 local isMasterRunning = false
 local timers = {0, 0, 0, 0}
+local tabButtons = {} -- Pre-deklarácia kvôli funkciám
 
 -- Helper funkcia na generovanie čistého slotu
 local function GetDefaultSlot()
@@ -20,6 +21,18 @@ local function GetDefaultSlot()
         interval = 60,
         channels = { SAY = false, YELL = false, CH1 = false, CH2 = false, CH3 = false, CH4 = false, CH5 = false, CH6 = false }
     }
+end
+
+-- Vizuálna funkcia na prefarbovanie Tabov
+local function UpdateTabVisuals()
+    if not SausageAutomsgDB.slots then return end
+    for i = 1, 4 do
+        if SausageAutomsgDB.slots[i] and SausageAutomsgDB.slots[i].enabled then
+            tabButtons[i]:SetText("|cff00ff00Msg " .. i .. "|r") -- Zelená
+        else
+            tabButtons[i]:SetText("|cffffd200Msg " .. i .. "|r") -- Sausage Zlatá
+        end
+    end
 end
 
 -- [[ UI UTILS ]]
@@ -80,12 +93,11 @@ local closeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelCloseButton")
 closeBtn:SetPoint("TOPRIGHT", -8, -8)
 
 -- [[ TABS ]]
-local tabButtons = {}
 for i = 1, 4 do
     local btn = CreateFrame("Button", "SausageTab"..i, MainFrame, "UIPanelButtonTemplate")
     btn:SetSize(80, 25)
     btn:SetPoint("TOPLEFT", 18 + ((i-1)*90), -40)
-    btn:SetText("Msg " .. i)
+    btn:SetText("|cffffd200Msg " .. i .. "|r")
     btn:SetScript("OnClick", function() LoadTab(i) end)
     tabButtons[i] = btn
 end
@@ -100,6 +112,8 @@ enableCheck:SetScript("OnClick", function(self)
     if SausageAutomsgDB.slots and SausageAutomsgDB.slots[currentTab] then
         local isChecked = self:GetChecked() and true or false
         SausageAutomsgDB.slots[currentTab].enabled = isChecked
+        
+        UpdateTabVisuals() -- Okamžitá aktualizácia farieb tabov
         
         local stateText = isChecked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"
         print("|cffffd200Sausage:|r Broadcasting for Msg " .. currentTab .. " is " .. stateText)
@@ -282,13 +296,17 @@ local startBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
 startBtn:SetSize(140, 35)
 startBtn:SetPoint("BOTTOMLEFT", 25, 45)
 startBtn:SetText("MASTER START")
+
 startBtn:SetScript("OnClick", function(self)
     isMasterRunning = not isMasterRunning
-    self:SetText(isMasterRunning and "MASTER STOP" or "MASTER START")
     if isMasterRunning then
+        self:SetText("|cff00ff00MASTER STOP|r")
+        self:LockHighlight() -- Tlačidlo zostane vizuálne "vysvietené"
         for i=1, 4 do timers[i] = 999 end
         print("|cffffd200Sausage:|r Automsg Engine |cff00ff00STARTED|r")
     else
+        self:SetText("MASTER START")
+        self:UnlockHighlight() -- Vráti tlačidlo do normálu
         print("|cffffd200Sausage:|r Automsg Engine |cffff0000STOPPED|r")
     end
 end)
@@ -427,6 +445,7 @@ MainFrame:SetScript("OnEvent", function(self, event, addon)
         end
 
         UpdateMinimapPos()
+        UpdateTabVisuals() -- Inicializačné prefarbenie tabov
         LoadTab(1)
         self:UnregisterEvent("ADDON_LOADED")
     end
