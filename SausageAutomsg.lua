@@ -2,7 +2,7 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.1.0"
+local SAUSAGE_VERSION = "@project-version@"
 local ADDON_NAME = "SausageAutomsg"
 
 -- Inicializácia globálnej tabuľky
@@ -11,7 +11,12 @@ SausageAutomsgDB = SausageAutomsgDB or {}
 local currentTab = 1
 local isMasterRunning = false
 local timers = {0, 0, 0, 0}
-local tabButtons = {} -- Pre-deklarácia kvôli funkciám
+local tabButtons = {}
+
+-- Anti-Spam Fronta
+local messageQueue = {}
+local queueTimer = 0
+local QUEUE_DELAY = 1.5 -- Čakanie 1.5 sekundy medzi jednotlivými správami
 
 -- Helper funkcia na generovanie čistého slotu
 local function GetDefaultSlot()
@@ -28,9 +33,9 @@ local function UpdateTabVisuals()
     if not SausageAutomsgDB.slots then return end
     for i = 1, 4 do
         if SausageAutomsgDB.slots[i] and SausageAutomsgDB.slots[i].enabled then
-            tabButtons[i]:SetText("|cff00ff00Msg " .. i .. "|r") -- Zelená
+            tabButtons[i]:SetText("|cff00ff00Msg " .. i .. "|r")
         else
-            tabButtons[i]:SetText("|cffffd200Msg " .. i .. "|r") -- Sausage Zlatá
+            tabButtons[i]:SetText("|cffffd200Msg " .. i .. "|r")
         end
     end
 end
@@ -113,7 +118,7 @@ enableCheck:SetScript("OnClick", function(self)
         local isChecked = self:GetChecked() and true or false
         SausageAutomsgDB.slots[currentTab].enabled = isChecked
         
-        UpdateTabVisuals() -- Okamžitá aktualizácia farieb tabov
+        UpdateTabVisuals()
         
         local stateText = isChecked and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"
         print("|cffffd200Sausage:|r Broadcasting for Msg " .. currentTab .. " is " .. stateText)
@@ -251,21 +256,30 @@ end
 
 MainFrame:SetScript("OnShow", function() LoadTab(currentTab) end)
 
--- [[ ENGINE - LOGIKA ODOSIELANIA ]]
+-- [[ ENGINE - LOGIKA ODOSIELANIA (ANTI-SPAM QUEUE) ]]
+local function EnqueueMessage(msgText, chatType, channelIndex)
+    table.insert(messageQueue, {
+        text = msgText,
+        chatType = chatType,
+        channelIndex = channelIndex
+    })
+end
+
 local function SendSlotAdvert(slotIndex)
     local slot = SausageAutomsgDB.slots[slotIndex]
     local text = slot.text
     if text == "" then return end
 
-    if slot.channels.SAY then SendChatMessage(text, "SAY") end
-    if slot.channels.YELL then SendChatMessage(text, "YELL") end
+    -- Namiesto okamžitého odoslania, zaradíme správy do fronty
+    if slot.channels.SAY then EnqueueMessage(text, "SAY") end
+    if slot.channels.YELL then EnqueueMessage(text, "YELL") end
     
     local activeChannels = {GetChannelList()}
     for chNum = 1, 6 do
         if slot.channels["CH"..chNum] then
             for i = 1, #activeChannels, 2 do
                 if activeChannels[i] == chNum then
-                    SendChatMessage(text, "CHANNEL", nil, chNum)
+                    EnqueueMessage(text, "CHANNEL", chNum)
                     break
                 end
             end
@@ -275,6 +289,20 @@ end
 
 local EngineFrame = CreateFrame("Frame")
 EngineFrame:SetScript("OnUpdate", function(self, elapsed)
+    -- 1. Spracovanie Queue (Odosielanie s oneskorením 1.5s)
+    if #messageQueue > 0 then
+        queueTimer = queueTimer + elapsed
+        if queueTimer >= QUEUE_DELAY then
+            local msg = table.remove(messageQueue, 1)
+            -- msg.channelIndex je nil pre SAY/YELL, inak číslo kanálu
+            SendChatMessage(msg.text, msg.chatType, nil, msg.channelIndex)
+            queueTimer = 0
+        end
+    else
+        queueTimer = 0
+    end
+
+    -- 2. Kontrola intervalov a pridávanie do Queue
     if not isMasterRunning or type(SausageAutomsgDB.slots) ~= "table" then return end
     
     for i = 1, 4 do
@@ -301,12 +329,13 @@ startBtn:SetScript("OnClick", function(self)
     isMasterRunning = not isMasterRunning
     if isMasterRunning then
         self:SetText("|cff00ff00MASTER STOP|r")
-        self:LockHighlight() -- Tlačidlo zostane vizuálne "vysvietené"
+        self:LockHighlight()
         for i=1, 4 do timers[i] = 999 end
         print("|cffffd200Sausage:|r Automsg Engine |cff00ff00STARTED|r")
     else
         self:SetText("MASTER START")
-        self:UnlockHighlight() -- Vráti tlačidlo do normálu
+        self:UnlockHighlight()
+        messageQueue = {} -- Fail-safe: Vycistí frontu akonáhle zastavíš engine
         print("|cffffd200Sausage:|r Automsg Engine |cffff0000STOPPED|r")
     end
 end)
@@ -348,7 +377,6 @@ gitEditBox:SetAutoFocus(true)
 
 local GITHUB_LINK = "https://github.com/NikowskyWow/SausageAutomsg/releases"
 
--- Nezničiteľný text skript
 gitEditBox:SetScript("OnTextChanged", function(self)
     if self:GetText() ~= GITHUB_LINK then
         self:SetText(GITHUB_LINK)
@@ -445,7 +473,7 @@ MainFrame:SetScript("OnEvent", function(self, event, addon)
         end
 
         UpdateMinimapPos()
-        UpdateTabVisuals() -- Inicializačné prefarbenie tabov
+        UpdateTabVisuals()
         LoadTab(1)
         self:UnregisterEvent("ADDON_LOADED")
     end
