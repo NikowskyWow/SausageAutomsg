@@ -2,7 +2,7 @@
 -- Author: Sausage Party / Kokotiar
 -- Design System: Sausage Addon Design System
 
-local SAUSAGE_VERSION = "1.1.1"
+local SAUSAGE_VERSION = "SAUSAGE_VERSION"
 local ADDON_NAME = "SausageAutomsg"
 
 -- Inicializácia globálnej tabuľky
@@ -81,6 +81,7 @@ MainFrame:SetBackdrop({
     tile = true, tileSize = 32, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 }
 })
+MainFrame:SetBackdropColor(1, 1, 1, 1)
 tinsert(UISpecialFrames, "SausageAutomsgFrame")
 MainFrame:Hide()
 
@@ -415,36 +416,44 @@ end)
 -- [[ MINIMAP ICON ]]
 local MinimapBtn = CreateFrame("Button", "SausageAutomsgMinimap", Minimap)
 MinimapBtn:SetSize(31, 31)
+MinimapBtn:SetFrameStrata("MEDIUM")
 MinimapBtn:SetFrameLevel(8)
 MinimapBtn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
 local icon = MinimapBtn:CreateTexture(nil, "BACKGROUND")
 icon:SetTexture("Interface\\Icons\\Inv_Misc_Food_54")
 icon:SetSize(20, 20)
-icon:SetPoint("CENTER", 0, 0)
+icon:SetPoint("CENTER")
 
 local border = MinimapBtn:CreateTexture(nil, "OVERLAY")
 border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-border:SetSize(53, 53)
-border:SetPoint("TOPLEFT", 0, 0)
+border:SetSize(52, 52)
+border:SetPoint("TOPLEFT")
+border:SetVertexColor(1, 0.6, 0) -- Sausage orange
 
 local function UpdateMinimapPos()
-    local angle = rad(SausageAutomsgDB.minimapPos or 45)
-    MinimapBtn:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 52 - (80 * cos(angle)), (80 * sin(angle)) - 52)
+    local angle = math.rad(SausageAutomsgDB.minimapPos or 45)
+    MinimapBtn:SetPoint("CENTER", Minimap, "CENTER", math.cos(angle) * 80, math.sin(angle) * 80)
 end
 
 MinimapBtn:RegisterForDrag("RightButton")
-MinimapBtn:SetScript("OnDragStart", function(self) self.isDragging = true end)
-MinimapBtn:SetScript("OnDragStop", function(self) self.isDragging = false end)
-MinimapBtn:SetScript("OnUpdate", function(self)
-    if self.isDragging then
+MinimapBtn:SetScript("OnDragStart", function(self)
+    self:LockHighlight()
+    self:SetScript("OnUpdate", function()
         local xpos, ypos = GetCursorPosition()
         local xmin, ymin = Minimap:GetLeft(), Minimap:GetBottom()
-        xpos = xmin - xpos / Minimap:GetEffectiveScale() + 70
-        ypos = ypos / Minimap:GetEffectiveScale() - ymin - 70
-        SausageAutomsgDB.minimapPos = deg(atan2(ypos, xpos))
+        local scale = Minimap:GetEffectiveScale()
+        xpos = (xpos / scale) - xmin - 70
+        ypos = (ypos / scale) - ymin - 70
+        local angle = math.deg(math.atan2(ypos, xpos))
+        if angle < 0 then angle = angle + 360 end
+        SausageAutomsgDB.minimapPos = angle
         UpdateMinimapPos()
-    end
+    end)
+end)
+MinimapBtn:SetScript("OnDragStop", function(self)
+    self:UnlockHighlight()
+    self:SetScript("OnUpdate", nil)
 end)
 MinimapBtn:SetScript("OnClick", function(self, btn)
     if btn == "LeftButton" then

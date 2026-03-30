@@ -2,7 +2,7 @@
 ## Title: |cffffd200Sausage|r Automsg
 ## Notes: Advanced auto-messaging utility. Minimap only. English localization.
 ## Author: Sausage Party / Kokotiar
-## Version: 1.1.1
+## Version: SAUSAGE_VERSION
 ## SavedVariables: SausageAutomsgDB
 
 SausageAutomsg.lua
